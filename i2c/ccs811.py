@@ -21,7 +21,7 @@ INITIALBASELINE = False
 # Do you want to use integrated temperature meter to compensate temp/RH (CJMCU-8118 board)?
 # If not pre-set sensor compensation temperature is 25 C and RH is 50 %
 # You can compensate manually by method ccs811.setCompensation(temperature,humidity) 
-HDC1080         = False
+HDC1080         = True
 
 '''
 MEAS MODE REGISTER AND DRIVE MODE CONFIGURATION
@@ -35,7 +35,7 @@ MEAS MODE REGISTER AND DRIVE MODE CONFIGURATION
 configuration = 0b100000
 
 # Set read interval for retriveving last measurement data from the sensor
-pause = 60
+pause = 3
 
 def thingSpeak(eCO2,TVOC,baseline,temperature,humidity):
     print 'Sending to ThingSpeak API...'

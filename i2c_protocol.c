@@ -98,7 +98,7 @@ int receive_byte(){
 		bits[i]=receive_bit();
 		delayMicroseconds(SLEEP_TIME);
 	}
-	ret = 0;
+	int ret = 0;
 	for(i = 0 ; i < 8 ;i++){
 		ret*=2;
 		ret+=bits[i];
@@ -109,7 +109,7 @@ int receive_byte(){
 //args -> slave addr is address of a slave, we then shift one bit to the left
 // then we add 1 to the addr if we want to read from it.  
 int read_from_slave(int slave_addr,int reg_addr){
-		slave_adrr = (slave_addr<<1) + 1;
+		int slave_adrr = (slave_addr<<1) + 1;
 		//start sequence
 		start_tx();
 		//send the address and wait for response
@@ -152,8 +152,12 @@ int main(void){
 	
 	printf("Delay...\n");
 	usleep(500000);
+	
+	//for(int i =0; i<10; i++){
 	send_high();
 	send_low();
+	//}
+	send_byte(2);
 	if(reset_gpio()!=0){
 		printf("Failed to reset some connections, reset the pin 2 and 3 maunally to alt0\n");
 		return 1;
