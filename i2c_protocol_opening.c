@@ -10,6 +10,18 @@
 #define SIG_TIME 50
 #define SLEEP_TIME 50
 //send high - when clock is high the data transfer is relevant -> clock streching is holding the line low to prevent data flow.
+
+#define HDC1080_ADDR 0x40
+#define HDC1080_REG_TEMP 0x00
+#define HDC1080_REG_HUM 0x01
+#define HDC1080_REG_CONFIG 0x02
+
+#define CCS811_ADDR 0x5A
+#define CCS811_ENV_DATA_REG 0x05
+#define CCS811_REG_ALG_RESULT 0x02
+#define CCS811_APP_START 0xF4
+#define CCS811_MEAS_MODE 0x01
+
 char reset_sda[19];
 char reset_scl[19];
 
@@ -203,24 +215,102 @@ void setup_i2c(void) {
 
 }
 
+void print_temp_hum_CO2(double temp, double humidity, int CO2){
+    printf("Temperature: %.2f C\n", temp);
+    printf("Humidity: %.2f %\n", humidity);
+    printf("CO2: %dppm\n", CO2);
+    printf("\n");
+}
+
+double read_temperature(){
+    write_to_slave(HDC1080_ADDR, HDC1080_REG_TEMP, 0);
+    delayMicroseconds(65);
+    int read_temp = read_from_slave(HDC1080_ADDR, HDC1080_REG_TEMP);
+    delayMicroseconds(15);
+    
+    double temp = ((double)read_temp/(1<<16))*165.0-40.0;
+    return temp;
+}
+
+double read_humidity(){
+    write_to_slave(HDC1080_ADDR, HDC1080_REG_HUM, 0);
+    delayMicroseconds(65);
+    int read_hum = read_from_slave(HDC1080_ADDR, HDC1080_REG_HUM);
+    delayMicroseconds(15);
+    
+    double humidity = ((double)read_hum/(1<<16)) * 100;
+    return humidity;
+}
+
+void set_compensation(double temperature, double humidity){
+    delayMicroseconds(15);
+    int hum1 = (int) (humidity/0.5);
+    int hum2 = (int) (humidity * 512 - hum1 * 256);
+    int tmp1 = (int) (temperature / 0.5);
+    int tmp2 = (int) (temperature * 512 - tmp1 * 256);
+    int data[] = {5, hum1, hum2, temp1, temp2, 0x00};
+    write_to_slave(CCS811_ADDR, CCS811_ENV_DATA_REG, data);
+}
+
+int read_CO2(){
+    delayMicroseconds(250);
+    delayMicroseconds(15);
+    write_to_slave(CCS811_ADDR, CCS811_REG_ALG_RESULT, 0);
+    delayMicroseconds(65);
+    int read_CO2_result = read_from_slave(CCS811_ADDR, CCS811_REG_ALG_RESULT);
+    return read_CO2_result;
+}
+
+void init_CCS811(){
+    // configure sensor
+    delayMicroseconds(15);
+    write_to_slave(CCS811_ADDR, CCS811_APP_START, 0);
+    delayMicroseconds(65);
+    
+    int data[] = {1<<5, 0};
+    write_to_slave(CCS811_ADDR, CCS811_MEAS_MODE, data);
+    delayMicroseconds(15);
+}
 
 int main(void) {
     wiringPiSetupGpio();
     setup_i2c();
+    delayMicroseconds(15);
+    /********************/
+    //
+    // 00010000 00000000
+    // 12th bit to 1 (to set measurement both temp and humidity)
+    // 10th bit to 0 (14 bit temp resolution)
+    // 9th, 8th bit to 0 (14 bit humidity resolution)
+    int data[] = {1<<4, 0<<8};
+    write_to_slave(HDC1080_ADDR, HDC1080_REG_CONFIG, data);
+    delayMicroseconds(15);  //
+    /*******************/
+    
+    init_CCS811();
+
+    
 
     int i;
     printf("Setup done. Execution begins...\n");
 
     printf("Delay...\n");
     delayMicroseconds(15);
-    int data[] = {16, 0};
-    write_to_slave(64, 2,data);
-    delayMicroseconds(15);
-    write_to_slave(64, 0,0);
-    delayMicroseconds(10);
-    int read = read_from_slave(64,0);
-    double temp = ((double)read/pow(2,16))*165.0-40.0;
-    printf("%d\n%f\n",read,temp);
+    
+    for(int i = 0; i < 10; i++){
+        double temperature = read_temperature();
+        double humidity = read_humidity();
+        set_compensation(temperature, humidity);
+        int CO2 = read_CO2;
+        
+        print_temp_hum_CO2(temperature, humidity, CO2);
+        delayMicroseconds(1000);
+    }
+
+    
+
+
+    
     if (reset_gpio() != 0) {
         printf("Failed to reset some connections, reset the pin 2 and 3 maunally to alt0\n");
         return 1;
